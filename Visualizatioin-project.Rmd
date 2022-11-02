@@ -1,0 +1,189 @@
+---
+title: 'Visualization Project: Walmart store sales analysis'
+author: "Sneha KK"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,warning = FALSE, message = FALSE,fig.width = 6,
+ out.width="50%")
+
+```
+
+__Introduction:__
+
+Sales analysis is an important aspect of running a store as we need to understand the factors that influence sales if we want to increase profit and customer satisfaction.
+It provides insights into the past, present, and future performance and can be used to help forecast trends, identify opportunities for growth, and develop a strategic action plan for the stores.
+The aim of this project is to analyze the sales of Walmart stores to find how 
+different features impact the sales in a Walmart supermarket using exploratory data 
+analysis and R visualizations.\
+
+__Data set description:__\
+The data set was downloaded from kaggle: \ https://www.kaggle.com/competitions/walmart-recruiting-store-sales-forecasting
+It contains the historical sales data for 45 Walmart stores located in different 
+regions, and each store contains a number of departments. The data is distributed 
+in four csv files:\
+1. stores.csv : type and size of stores\
+2. train.csv: This is the historical training data, which covers to 2010-02-05 to 2012-11-01.The features represent store number,department number, date , weekly sales(sales for the given department in the given store) and isholiday(whether the week is a special holiday or not)\
+3. test.csv: This file is identical to train.csv, except weekly sales column is absent.\
+4.features.csv: This file contains additional data related to the store, department, and regional activity for the given dates. It contains features like store number,date, temperature, fuel price, markdown, CPI, unemployment rate,holidays\
+
+
+__Project methodology:__\
+The dataset was downloaded and checked for null values:
+
+
+```{r include=FALSE}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(corrplot)
+```
+
+```{r,echo=FALSE}
+test_df<-read.csv("C:/CMI Datascience/Sem1/VISU/test.csv")
+train_df<-read.csv("C:/CMI Datascience/Sem1/VISU/train.csv")
+feat_df<-read.csv("C:/CMI Datascience/Sem1/VISU/features.csv")
+stores_df<-read.csv("C:/CMI Datascience/Sem1/VISU/stores.csv")
+
+#check for null:
+checkna<-function(df){
+  apply(is.na(df),2,function(x) mean(x))
+}
+checkna(train_df)
+checkna(test_df)
+checkna(feat_df)
+checkna(stores_df)  
+#only markdown has null values.
+```
+Only markdown columns have many null values, because the stores offer promotional markdowns only on some days of the year.\
+
+Some departments did not sell any items in some weeks, and the department numbers do not over all integer values: \
+```{r,echo=FALSE}
+options(repr.plot.width = 0.2, repr.plot.height =0.2)
+
+#department wise number of obs
+tt<-train_df%>%group_by(Dept)%>% 
+  summarise(total_count=n(),sales=mean(Weekly_Sales),.groups = 'drop')
+ggplot(data=tt, aes(x=Dept, y=total_count)) +
+  geom_bar(stat="identity",color='purple')+xlab('department number')+ylab('number of observations')+ggtitle("Number of observations per department")
+```
+
+Most of the departments have more than 6000 observations while a few departments like 47,76,77,99 rarely made any sales.
+
+Distribution of the weekly sales, log transformed: \
+```{r,echo=FALSE}
+#Counts of weekly sales (log)
+ggplot(data=train_df,aes(x=Weekly_Sales))+geom_histogram(color='blue')+scale_x_log10()+xlab('Weekly sales')+ggtitle('Weekly sales');
+```
+
+Mean weekly sales is approximately 16000 dollars.\
+Number of holidays among the 115064 days in dataset:\
+
+```{r,echo=FALSE}
+#Sales during holiday weeks (log):
+holidays <-train_df %>%filter(IsHoliday == T)
+nrow(holidays)
+ggplot(data=holidays,aes(x=Weekly_Sales))+geom_histogram(color='blue')+scale_x_log10()+ggtitle('Holiday sales')+xlab('Sales')+ylab('count')
+```
+
+Mean holiday sales is approximately 17000 dollars.\
+Department wise weekly sales:\
+```{r,echo=FALSE}
+#Department wise weekly sales
+ggplot(data=tt,aes(x=Dept,y=sales))+geom_bar(stat='identity',color='green')+ggtitle('Department wise weekly sales')+xlab('Department number')+ylab('Weekly sales')
+
+```
+
+Departments 92,95 and 38 have the highest weekly sales.\
+Department wise mean sale amount:\
+```{r,echo=FALSE}
+#mean sale amount
+ggplot(data=tt,aes(x=Dept,y=(sales/total_count)))+geom_bar(stat='identity',color='red')
+```
+
+Department 65 has unusually high values, so let's remove it from our graph:\
+```{r,echo=FALSE}
+#department 65 has unusually high avg sales
+td<-tt%>%filter(Dept!=65)
+ggplot(data=td,aes(x=Dept,y=(sales/total_count)))+geom_bar(stat='identity',color='red')
+```
+
+Departments 92,95,38 have the highest mean sales also.\
+Let's view the mean sales amount for the three years:\
+```{r,echo=FALSE}
+train_df$year<-format(as.Date(train_df$Date),format="%Y")
+tw<-train_df%>%group_by(year)%>% 
+  summarise(sales=mean(Weekly_Sales),.groups = 'drop')
+ggplot(data=tw,aes(x=year,y=sales,fill=year))+geom_bar(stat='identity')+xlab('year')+ylab('mean sales amount')+ggtitle('Mean sales amount over the years')
+
+```
+
+Mean sales amount is almost same but slightly decreasing over the years.\
+Variation of mean CPI over the years:\
+```{r,echo=FALSE}
+feat_df$year<-format(as.Date(feat_df$Date),format="%Y")
+fg<-feat_df%>%group_by(year)%>% 
+  summarise(cpi=mean(CPI,na.rm=T),Unemp=mean(Unemployment,na.rm=T),.groups = 'drop')
+ggplot(data=fg,aes(x=year,y=cpi,fill=year))+geom_bar(stat='identity')+xlab('year')+ylab('mean cpi')+ggtitle('Mean Consumer Price Index over the years')
+```
+
+Mean Consumer Price index has an upward trend.\
+Mean unemployment rate:\
+```{r,echo=FALSE}
+ggplot(data=fg,aes(x=year,y=Unemp,fill=year))+geom_bar(stat='identity')+xlab('year')+ylab('mean unemployment rate')+ggtitle('Mean Unemployment rate over the years')
+```
+
+Mean unemployment rate is decreasing over the years.\
+Mean of the promotional markdowns offered:\
+```{r,echo=FALSE}
+m<-feat_df%>%rowwise()%>%mutate(markdown = sum(MarkDown1,MarkDown2,MarkDown3,MarkDown4,MarkDown5, na.rm=TRUE))
+mk<-m%>%filter(markdown>0)
+mkk<-mk%>%group_by(year)%>%summarise(markdown=mean(markdown,na.rm=T),.groups = 'drop')
+ggplot(data=mkk,aes(x=year,y=markdown,fill=year))+geom_bar(stat='identity')+xlab('year')+ylab('Markdown')+ggtitle('Mean Markdown over the years')
+
+```
+
+Mean markdown was highest in 2011, almost same in 2012 and 2013.\
+
+```{r,echo=FALSE}
+ft<-merge(train_df,feat_df)
+ft<-ft%>%rowwise()%>%mutate(markdown = sum(MarkDown1,MarkDown2,MarkDown3,MarkDown4,MarkDown5, na.rm=TRUE))
+t<-select(ft,-Date,-MarkDown1,-MarkDown2,-MarkDown3,-MarkDown4,-MarkDown5)
+t$IsHoliday<-ifelse(t$IsHoliday==TRUE,1,0)
+t<-transform(t,year=as.numeric(year))
+cc<-round(cor(t),2)
+corrplot(cc) 
+
+```
+
+We can see that none of the variables have high correlation between them. Fuel price and year, markdown and year are positively correlated whereas Unemployment rate and CPI, CPI and stores and year and unemployment are negatively correlated.
+
+
+A dashboard of visuals will be created using RShiny,and a tentative list of graphs to be plotted is provided below :\
+* A panel for plots of the four main holidays(Super bowl, labor day, thanksgiving, Christmas) vs weekly sales:\
+  + Bar graphs : year vs sales for each holiday. \
+  + Bar graphs: comparing total sales of all holidays.\
+  + Bar graphs: comparing mark downs of all holidays\
+* A panel of barplots: sales per year for each department.\
+* A pie chart showing sales distribution over the months.\
+* Histograms : to show the distribution of sale prices,holiday sales,markdowns.\
+* Bar plot: Number of observations per department.\
+* Bar plots: mean sales amount,unemployment rate,number of markdowns, mean markdown amount,mean consumer price per year.\
+* Line graphs: fuel price,markdown,consumer price,temperature and unemployment vs sales amount.\
+
+
+The dashboard will help us view our data in a consolidated format at one unified location. The interpretations drawn from the graphs will help us understand the factors influencing sales amount and customer needs which in turn will lead to more profit and customer satisfaction.
+
+__Conclusions:__\
+After detailed analysis and visualization of the Walmart sales data,we can infer the following :\
+* Mean weakly sales amount in Walmart super market is approximately 16000 dollars and is slightly decreasing over the years while mean holiday sales amount is approximately 17000 dollars.\
+* Departments 65,92,95,38 have the highest mean sales amount.\
+* Mean consumer price index is increasing over the years while mean unemployment rate and mean markdown amount are decreasing over the years.\
+* Fuel price and year, markdown and year are positively correlated whereas Unemployment rate and CPI, CPI and stores and year and unemployment are negatively correlated.\
+
+Hence, from Walmart sales data, we can conclude that lower CPI and higher markdown offers , investing in departments 65,92,95 and 38 would lead to an increase in sales profit.\
