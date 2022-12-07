@@ -62,23 +62,19 @@ checkna(stores_df)
 ```
 Only markdown columns have many null values, because the stores offer promotional markdowns only on some days of the year.\
 
-Some departments did not sell any items in some weeks, and the department numbers do not over all integer values: \
 ```{r,echo=FALSE}
 options(repr.plot.width = 0.2, repr.plot.height =0.2)
 
-#department wise number of obs
 tt<-train_df%>%group_by(Dept)%>% 
   summarise(total_count=n(),sales=mean(Weekly_Sales),.groups = 'drop')
-ggplot(data=tt, aes(x=Dept, y=total_count)) +
-  geom_bar(stat="identity",color='purple')+xlab('department number')+ylab('number of observations')+ggtitle("Number of observations per department")
+
 ```
 
-Most of the departments have more than 6000 observations while a few departments like 47,76,77,99 rarely made any sales.
 
 Distribution of the weekly sales, log transformed: \
 ```{r,echo=FALSE}
 #Counts of weekly sales (log)
-ggplot(data=train_df,aes(x=Weekly_Sales))+geom_histogram(color='blue')+scale_x_log10()+xlab('Weekly sales')+ggtitle('Weekly sales');
+ggplot(data=train_df,aes(x=Weekly_Sales))+geom_histogram(color='white',fill='purple')+scale_x_log10()+xlab('Weekly sales')+ggtitle('Weekly sales');
 ```
 
 Mean weekly sales is approximately 16000 dollars.\
@@ -88,14 +84,14 @@ Number of holidays among the 115064 days in dataset:\
 #Sales during holiday weeks (log):
 holidays <-train_df %>%filter(IsHoliday == T)
 nrow(holidays)
-ggplot(data=holidays,aes(x=Weekly_Sales))+geom_histogram(color='blue')+scale_x_log10()+ggtitle('Holiday sales')+xlab('Sales')+ylab('count')
+ggplot(data=holidays,aes(x=Weekly_Sales))+geom_histogram(color='white',fill='purple')+scale_x_log10()+ggtitle('Holiday sales')+xlab('Sales')+ylab('count')
 ```
 
 Mean holiday sales is approximately 17000 dollars.\
 Department wise weekly sales:\
 ```{r,echo=FALSE}
 #Department wise weekly sales
-ggplot(data=tt,aes(x=Dept,y=sales))+geom_bar(stat='identity',color='green')+ggtitle('Department wise weekly sales')+xlab('Department number')+ylab('Weekly sales')
+ggplot(data=tt,aes(x=Dept,y=sales))+geom_bar(stat='identity',fill='green')+ggtitle('Department wise weekly sales')+xlab('Department number')+ylab('Weekly sales')
 
 ```
 
@@ -103,14 +99,14 @@ Departments 92,95 and 38 have the highest weekly sales.\
 Department wise mean sale amount:\
 ```{r,echo=FALSE}
 #mean sale amount
-ggplot(data=tt,aes(x=Dept,y=(sales/total_count)))+geom_bar(stat='identity',color='red')
+ggplot(data=tt,aes(x=Dept,y=(sales/total_count)))+geom_bar(stat='identity',fill='red')
 ```
 
 Department 65 has unusually high values, so let's remove it from our graph:\
 ```{r,echo=FALSE}
 #department 65 has unusually high avg sales
 td<-tt%>%filter(Dept!=65)
-ggplot(data=td,aes(x=Dept,y=(sales/total_count)))+geom_bar(stat='identity',color='red')
+ggplot(data=td,aes(x=Dept,y=(sales/total_count)))+geom_bar(stat='identity',fill='red')
 ```
 
 Departments 92,95,38 have the highest mean sales also.\
@@ -119,11 +115,11 @@ Let's view the mean sales amount for the three years:\
 train_df$year<-format(as.Date(train_df$Date),format="%Y")
 tw<-train_df%>%group_by(year)%>% 
   summarise(sales=mean(Weekly_Sales),.groups = 'drop')
-ggplot(data=tw,aes(x=year,y=sales,fill=year))+geom_bar(stat='identity')+xlab('year')+ylab('mean sales amount')+ggtitle('Mean sales amount over the years')
+ggplot(data=train_df,aes(x=year,y=Weekly_Sales))+geom_bar(stat='identity',color='magenta')+xlab('year')+ylab('sales amount')+ggtitle('sales amount over the years')
 
 ```
 
-Mean sales amount is almost same but slightly decreasing over the years.\
+Sales in 2011 is the highest and 2012 is the least.\
 Variation of mean CPI over the years:\
 ```{r,echo=FALSE}
 feat_df$year<-format(as.Date(feat_df$Date),format="%Y")
@@ -141,8 +137,8 @@ ggplot(data=fg,aes(x=year,y=Unemp,fill=year))+geom_bar(stat='identity')+xlab('ye
 Mean unemployment rate is decreasing over the years.\
 Mean of the promotional markdowns offered:\
 ```{r,echo=FALSE}
-m<-feat_df%>%rowwise()%>%mutate(markdown = sum(MarkDown1,MarkDown2,MarkDown3,MarkDown4,MarkDown5, na.rm=TRUE))
-mk<-m%>%filter(markdown>0)
+feat_df<-feat_df%>%rowwise()%>%mutate(markdown = sum(MarkDown1,MarkDown2,MarkDown3,MarkDown4,MarkDown5, na.rm=TRUE))
+mk<-feat_df%>%filter(markdown>0)
 mkk<-mk%>%group_by(year)%>%summarise(markdown=mean(markdown,na.rm=T),.groups = 'drop')
 ggplot(data=mkk,aes(x=year,y=markdown,fill=year))+geom_bar(stat='identity')+xlab('year')+ylab('Markdown')+ggtitle('Mean Markdown over the years')
 
@@ -150,6 +146,57 @@ ggplot(data=mkk,aes(x=year,y=markdown,fill=year))+geom_bar(stat='identity')+xlab
 
 Mean markdown was highest in 2011, almost same in 2012 and 2013.\
 
+Store type wise sales:\
+```{r,echo=FALSE}
+tshr=train_df[seq(1,nrow(train_df),143),]
+fs<-merge(tshr,feat_df,all=FALSE)
+fst<-merge(fs,stores_df)
+gp<-fst%>%group_by(across("Type"))%>%summarise(total_count=n(),.groups = 'drop')
+gp <- gp%>% 
+      mutate(perc = total_count / sum(total_count)) %>% 
+      arrange(perc) %>%
+      mutate(labels = scales::percent(perc))
+ggplot(gp,aes_string(y='total_count',x="''",fill="Type"))+geom_bar(stat='identity')+coord_polar('y')+ggtitle('Pie plot of count of store type')+geom_text(aes(label = labels),position = position_stack(vjust = 0.5))+scale_fill_manual(values=c("purple","pink","yellow"))
+  
+```
+
+Type A stores contributed to 51% of the sales, type B stores contributed to 39% of the sales and
+type C stores contributed to only 10% of the sales.
+
+```{r,echo=FALSE}
+fst<-transform(fst,Type=as.character(Type))
+ggplot(fst,aes_string(x="year",y="Weekly_Sales",fill="IsHoliday"))+geom_bar(stat='identity',position = 'dodge')+ggtitle(("Holiday-wise bar plot between sales and year"))
+```
+
+Total holiday sales is increasing over the years while the total working day sales is highest in 2011.\
+
+```{r,echo=FALSE}
+chris<-train_df[train_df$Date %in% c("2010-12-31","2011-12-30","2012-12-28"),]
+bowl<-train_df[train_df$Date %in% c("2010-02-12","2011-02-11","2012-02-10"),]
+labor<-train_df[train_df$Date %in% c("2010-09-10","2011-09-09","2012-09-07"),]
+thank<-train_df[train_df$Date %in% c("2010-11-26","2011-11-25","2012-11-23"),]
+chris<-chris%>%group_by(across("Date"))%>%summarise(sales=mean(Weekly_Sales))
+bowl<-bowl%>%group_by(across("Date"))%>%summarise(sales=mean(Weekly_Sales))
+labor<-labor%>%group_by(across("Date"))%>%summarise(sales=mean(Weekly_Sales))
+thank<-thank%>%group_by(across("Date"))%>%summarise(sales=mean(Weekly_Sales))
+chris$year<-format(as.Date(chris$Date),format="%Y")
+bowl$year<-format(as.Date(bowl$Date),format="%Y")
+labor$year<-format(as.Date(labor$Date),format="%Y")
+thank$year<-format(as.Date(thank$Date),format="%Y")
+n1=merge(labor,bowl,by='year')
+n2=merge(chris,thank,by='year')
+
+h=merge(n1,n2,by='year',all.x=TRUE)
+colnames(h)<-c("year","datel","salesl","dateb","salesb","datec","salesc","datet","salest")
+ggplot(h,aes(x=year))+geom_point(aes(y=salesc,color='red'),group=1)+geom_line(aes(y=salesc),color='red',group=1)+geom_point(aes(y=salesl,color='blue'),group=1)+geom_line(aes(y=salesl),color='blue',group=1)+geom_point(aes(y=salest,color='#FF9900'),group=1)+geom_line(aes(y=salest),color='#FF9900',group=1)+geom_point(aes(y=salesb,color='#990099'),group=1)+geom_line(aes(y=salesb),color='#990099',group=1)+
+      ylab("Sales")+ggtitle("Holidays vs sales")+
+     scale_color_manual(name='Holidays',values = c(
+         'Christmas' = 'red',
+         'Labor day' = 'blue','Thanksgiving'='#FF9900','Super bowl'='#990099')) +
+      labs(color = 'Holidays')
+```
+
+Sales during thanks giving is the highest and sales during christmas is the least.
 ```{r,echo=FALSE}
 ft<-merge(train_df,feat_df)
 ft<-ft%>%rowwise()%>%mutate(markdown = sum(MarkDown1,MarkDown2,MarkDown3,MarkDown4,MarkDown5, na.rm=TRUE))
@@ -163,27 +210,30 @@ corrplot(cc)
 
 We can see that none of the variables have high correlation between them. Fuel price and year, markdown and year are positively correlated whereas Unemployment rate and CPI, CPI and stores and year and unemployment are negatively correlated.
 
+__Dashboard__:\
+A dashboard of visuals was created using RShiny containing the following panels :\
+* Introduction\
+* Univariate analysis: Analysis of frequencies of different variables using bar plot, pie chart for categorical and histogram for continuous variables.\
+* Multivariate analysis: Analysing the relationship within factors using bar plots for categorical and categorical, categorical and continuous variables and scatter plot for analysis between continuous variables.\
+* Year wise analysis: Multi variate graphs combined and colored by year.\
+* Holiday wise analysis: This has two tab panels:\
+  + One panel contained multivariate graphs that were combined and colored by holiday/working day.\
+  + The second panel contained the line graphs of particular holidays.\
+* Store type wise analysis: Multivariate graphs combined and colored by store type.\
+Link to the dashboard: https://snehakk.shinyapps.io/visualization_project/
 
-A dashboard of visuals will be created using RShiny,and a tentative list of graphs to be plotted is provided below :\
-* A panel for plots of the four main holidays(Super bowl, labor day, thanksgiving, Christmas) vs weekly sales:\
-  + Bar graphs : year vs sales for each holiday. \
-  + Bar graphs: comparing total sales of all holidays.\
-  + Bar graphs: comparing mark downs of all holidays\
-* A panel of barplots: sales per year for each department.\
-* A pie chart showing sales distribution over the months.\
-* Histograms : to show the distribution of sale prices,holiday sales,markdowns.\
-* Bar plot: Number of observations per department.\
-* Bar plots: mean sales amount,unemployment rate,number of markdowns, mean markdown amount,mean consumer price per year.\
-* Line graphs: fuel price,markdown,consumer price,temperature and unemployment vs sales amount.\
-
-
-The dashboard will help us view our data in a consolidated format at one unified location. The interpretations drawn from the graphs will help us understand the factors influencing sales amount and customer needs which in turn will lead to more profit and customer satisfaction.
+The dashboard helps us view our data in a consolidated format at one unified location. The interpretations drawn from the graphs helpd us understand the factors influencing sales amount and customer needs which in turn will lead to more profit and customer satisfaction.\
 
 __Conclusions:__\
 After detailed analysis and visualization of the Walmart sales data,we can infer the following :\
 * Mean weakly sales amount in Walmart super market is approximately 16000 dollars and is slightly decreasing over the years while mean holiday sales amount is approximately 17000 dollars.\
 * Departments 65,92,95,38 have the highest mean sales amount.\
 * Mean consumer price index is increasing over the years while mean unemployment rate and mean markdown amount are decreasing over the years.\
+* Mean markdown was highest in 2011, almost same in 2012 and 2013.\
+* Type A stores contributed to 51% of the sales, type B stores contributed to 39% of the sales and
+type C stores contributed to only 10% of the sales.\
+* Total holiday sales is increasing over the years while the total working day sales is highest in 2011.\
+* Sales during thanks giving is the highest and sales during christmas is the least.\
 * Fuel price and year, markdown and year are positively correlated whereas Unemployment rate and CPI, CPI and stores and year and unemployment are negatively correlated.\
 
 Hence, from Walmart sales data, we can conclude that lower CPI and higher markdown offers , investing in departments 65,92,95 and 38 would lead to an increase in sales profit.\
